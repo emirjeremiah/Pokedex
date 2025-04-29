@@ -5,15 +5,20 @@ $(document).ready(function() {
     const loadMoreContainer = $('#loadMoreContainer');
     const searchInput = $('#searchInput');
     const searchButton = $('#searchButton');
-    const resetButton = $('#resetButton');
-    const generationFilterBtn = $('#generationFilterBtn');
-    const generationFilterContainer = $('#generationFilterContainer');
+    const clearButton = $('#clearButton');
+    const filterAll = $('#filterAll');
+    const filterNewest = $('#filterNewest');
+    const filterFavorites = $('#filterFavorites');
+    const addToFavoritesBtn = $('#addToFavoritesBtn');
     const generationInfo = $('#generationInfo');
     
     let currentOffset = 0;
     const limit = 20;
     let currentGeneration = 'all';
+    let currentFilter = 'all';
+    let favorites = JSON.parse(localStorage.getItem('pokemonFavorites')) || [];
     let currentPokemonCount = 0;
+    
     const generationLimits = {
         '1': { start: 1, end: 151 },
         '2': { start: 152, end: 251 },
@@ -43,19 +48,36 @@ $(document).ready(function() {
         }
     });
     
-    // Reset search
-    resetButton.click(function() {
+    // Clear search
+    clearButton.click(function() {
         searchInput.val('');
-        currentOffset = 0;
-        pokemonGrid.empty();
-        loadPokemon();
-        loadMoreContainer.show();
+        searchInput.focus();
     });
     
-    // Toggle generation filter
-    generationFilterBtn.click(function() {
-        generationFilterContainer.toggleClass('d-none');
+    // Filter buttons
+    filterAll.click(function() {
+        setFilter('all');
     });
+    
+    filterNewest.click(function() {
+        setFilter('newest');
+    });
+    
+    filterFavorites.click(function() {
+        setFilter('favorites');
+    });
+    
+    function setFilter(filter) {
+        currentFilter = filter;
+        currentOffset = 0;
+        pokemonGrid.empty();
+        
+        // Update active button
+        $('.filter-buttons .btn').removeClass('active');
+        $(`#filter${filter.charAt(0).toUpperCase() + filter.slice(1)}`).addClass('active');
+        
+        loadPokemon();
+    }
     
     // Filter by generation
     $('.generation-filter').click(function() {
@@ -71,7 +93,6 @@ $(document).ready(function() {
         }
         
         loadPokemon();
-        generationFilterContainer.addClass('d-none');
     });
     
     // Load Pokémon from API
@@ -109,13 +130,24 @@ $(document).ready(function() {
                             return null;
                         }
                     }
+                    
+                    // For newest filter
+                    if (currentFilter === 'newest' && pokemonData.id < 900) {
+                        return null;
+                    }
+                    
                     return pokemonData;
                 });
             });
             
             Promise.all(pokemonPromises).then(pokemonDetails => {
-                // Filter out null values (from generation filtering)
-                const validPokemon = pokemonDetails.filter(p => p !== null);
+                // Filter out null values (from generation/type filtering)
+                let validPokemon = pokemonDetails.filter(p => p !== null);
+                
+                // For favorites filter
+                if (currentFilter === 'favorites') {
+                    validPokemon = validPokemon.filter(pokemon => favorites.includes(pokemon.id));
+                }
                 
                 if (validPokemon.length > 0) {
                     displayPokemon(validPokemon);
@@ -173,9 +205,12 @@ $(document).ready(function() {
                 <span class="pokemon-type type-${type}">${type}</span>
             `).join('');
             
+            // Check if favorite
+            const isFavorite = favorites.includes(pokemonId);
+            
             const pokemonCard = `
                 <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 col-6">
-                    <div class="pokemon-card animate__animated animate__fadeIn gen-${generation}" data-id="${pokemonId}">
+                    <div class="pokemon-card animate__animated animate__fadeIn" data-id="${pokemonId}" data-generation="${generation}" data-favorite="${isFavorite}">
                         <div class="pokemon-img-container">
                             <img src="${pokemonImage}" alt="${pokemonName}" class="pokemon-img">
                         </div>
@@ -196,6 +231,19 @@ $(document).ready(function() {
             const pokemonId = $(this).data('id');
             showPokemonDetails(pokemonId);
         });
+        
+        // Apply current filter
+        applyCurrentFilter();
+    }
+    
+    function applyCurrentFilter() {
+        $('.pokemon-card').show();
+        
+        if (currentFilter === 'newest') {
+            $('.pokemon-card').not('[data-generation="9"]').hide();
+        } else if (currentFilter === 'favorites') {
+            $('.pokemon-card').not('[data-favorite="true"]').hide();
+        }
     }
     
     // Search Pokémon by name or ID
@@ -226,7 +274,6 @@ $(document).ready(function() {
             });
         } else {
             // Search by name - we need to handle this differently since the API doesn't support direct name search with limits
-            // We'll fetch all Pokémon and filter client-side (not ideal, but PokéAPI doesn't support name search with offset)
             loadingSpinner.html('<div class="spinner-border text-danger" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-3">Searching through all Pokémon...</p>');
             
             // First get the total count
@@ -285,12 +332,32 @@ $(document).ready(function() {
             const pokemonWeight = pokemon.weight / 10; // Convert to kg
             const pokemonAbilities = pokemon.abilities.map(ability => ability.ability.name);
             const pokemonStats = pokemon.stats;
+            const isFavorite = favorites.includes(pokemonId);
+            
+            // Update favorite button
+            updateFavoriteButton(pokemonId, isFavorite);
             
             // Get species data for description and evolution chain
             $.get(pokemon.species.url, function(species) {
-                const description = species.flavor_text_entries.find(
-                    entry => entry.language.name === 'en'
-                )?.flavor_text.replace(/\f/g, ' ') || 'No description available';
+                // Get all English flavor texts
+                const englishEntries = species.flavor_text_entries.filter(entry => entry.language.name === 'en');
+                
+                // Select the most recent game version description
+                const latestEntry = englishEntries.reduce((latest, entry) => {
+                    return (!latest || entry.version.name > latest.version.name) ? entry : latest;
+                }, null);
+                
+                // Fallback to any English description if no latest found
+                const description = latestEntry?.flavor_text.replace(/\f/g, ' ') || 
+                                  englishEntries[0]?.flavor_text.replace(/\f/g, ' ') || 
+                                  'No description available';
+                
+                // Get habitat if available
+                const habitat = species.habitat?.name || 'Unknown';
+                
+                // Get genus (short classification)
+                const genusEntry = species.genera.find(genus => genus.language.name === 'en');
+                const genus = genusEntry?.genus || 'Unknown species';
                 
                 // Determine generation
                 let generation = 1;
@@ -309,7 +376,23 @@ $(document).ready(function() {
                     });
                 }
                 
-                evolutionChainPromise.then(evolutionChain => {
+                // Get moves/learnset
+                const movesPromise = $.get(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`).then(pokemonData => {
+                    return pokemonData.moves.map(move => {
+                        return {
+                            name: move.move.name,
+                            details: move.version_group_details.map(detail => {
+                                return {
+                                    level: detail.level_learned_at,
+                                    method: detail.move_learn_method.name,
+                                    version: detail.version_group.name
+                                };
+                            })
+                        };
+                    });
+                });
+                
+                Promise.all([evolutionChainPromise, movesPromise]).then(([evolutionChain, moves]) => {
                     // Create type badges
                     const typeBadges = pokemonTypes.map(type => `
                         <span class="type-badge type-${type}">${type}</span>
@@ -330,10 +413,10 @@ $(document).ready(function() {
                     
                     // Create evolution display if available
                     let evolutionDisplay = '';
-                    if (evolutionChain) {
+                    if (evolutionChain && evolutionChain.length > 1) {
                         evolutionDisplay = `
                             <div class="mt-4">
-                                <h6>Evolution Chain</h6>
+                                <h6><i class="fas fa-link me-2"></i>Evolution Chain</h6>
                                 <div class="evolution-chain">
                                     ${evolutionChain.map(stage => `
                                         <div class="evolution-stage">
@@ -341,7 +424,7 @@ $(document).ready(function() {
                                                  alt="${stage.name}" 
                                                  width="80" 
                                                  height="80"
-                                                 class="${stage.id === pokemonId ? 'border border-3 border-danger rounded-circle' : ''}">
+                                                 class="${stage.id === pokemonId ? 'border border-3 border-primary rounded-circle' : ''}">
                                             <div class="text-capitalize">${stage.name}</div>
                                             <div>#${stage.id.toString().padStart(4, '0')}</div>
                                         </div>
@@ -351,36 +434,127 @@ $(document).ready(function() {
                         `;
                     }
                     
+                    // Group moves by learn method
+                    const levelUpMoves = moves.filter(move => 
+                        move.details.some(detail => detail.method === 'level-up')
+                    ).map(move => {
+                        const detail = move.details.find(d => d.method === 'level-up');
+                        return {
+                            name: move.name,
+                            level: detail.level
+                        };
+                    }).sort((a, b) => a.level - b.level);
+                    
+                    const machineMoves = moves.filter(move => 
+                        move.details.some(detail => detail.method === 'machine')
+                    ).map(move => ({
+                        name: move.name
+                    }));
+                    
+                    const eggMoves = moves.filter(move => 
+                        move.details.some(detail => detail.method === 'egg')
+                    ).map(move => ({
+                        name: move.name
+                    }));
+                    
+                    // Create moves display
+                    const movesDisplay = `
+                        <div class="mt-4">
+                            <ul class="nav nav-tabs" id="movesTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="levelup-tab" data-bs-toggle="tab" data-bs-target="#levelup" type="button" role="tab">
+                                        <i class="fas fa-level-up-alt me-1"></i>Level Up
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="machine-tab" data-bs-toggle="tab" data-bs-target="#machine" type="button" role="tab">
+                                        <i class="fas fa-compact-disc me-1"></i>TMs/HMs
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="egg-tab" data-bs-toggle="tab" data-bs-target="#egg" type="button" role="tab">
+                                        <i class="fas fa-egg me-1"></i>Egg Moves
+                                    </button>
+                                </li>
+                            </ul>
+                            <div class="tab-content" id="movesTabContent">
+                                <div class="tab-pane fade show active" id="levelup" role="tabpanel">
+                                    ${levelUpMoves.length > 0 ? 
+                                        levelUpMoves.map(move => `
+                                            <div class="learnset-move">
+                                                <span class="text-capitalize">${move.name.replace('-', ' ')}</span>
+                                                <span class="badge bg-primary">Lv. ${move.level}</span>
+                                            </div>
+                                        `).join('') : 
+                                        '<p class="text-muted mt-2">No level-up moves</p>'
+                                    }
+                                </div>
+                                <div class="tab-pane fade" id="machine" role="tabpanel">
+                                    ${machineMoves.length > 0 ? 
+                                        machineMoves.map(move => `
+                                            <div class="learnset-move">
+                                                <span class="text-capitalize">${move.name.replace('-', ' ')}</span>
+                                            </div>
+                                        `).join('') : 
+                                        '<p class="text-muted mt-2">No TM/HM moves</p>'
+                                    }
+                                </div>
+                                <div class="tab-pane fade" id="egg" role="tabpanel">
+                                    ${eggMoves.length > 0 ? 
+                                        eggMoves.map(move => `
+                                            <div class="learnset-move">
+                                                <span class="text-capitalize">${move.name.replace('-', ' ')}</span>
+                                            </div>
+                                        `).join('') : 
+                                        '<p class="text-muted mt-2">No egg moves</p>'
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
                     // Set modal content
                     $('#pokemonModalTitle').text(`#${pokemonId.toString().padStart(4, '0')} ${pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1)} (Gen ${generation})`);
                     
                     $('#pokemonModalBody').html(`
-                        <div class="text-center mb-4">
-                            <img src="${pokemonImage}" alt="${pokemonName}" class="modal-pokemon-img animate__animated animate__bounceIn">
-                            <div class="mt-2">${typeBadges}</div>
-                        </div>
-                        
-                        <p class="mb-4">${description}</p>
-                        
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <h6>Details</h6>
-                                <p><strong>Height:</strong> ${pokemonHeight} m</p>
-                                <p><strong>Weight:</strong> ${pokemonWeight} kg</p>
-                                <p><strong>Generation:</strong> ${generation}</p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="pokemon-details-header">
+                                    <img src="${pokemonImage}" alt="${pokemonName}" class="modal-pokemon-img animate__animated animate__bounceIn">
+                                    <div class="pokemon-types-modal mt-3">${typeBadges}</div>
+                                    <p class="mt-2 text-muted"><small>${genus}</small></p>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <h6><i class="fas fa-info-circle me-2"></i>Details</h6>
+                                    <p><strong><i class="fas fa-ruler-vertical me-2"></i>Height:</strong> ${pokemonHeight} m</p>
+                                    <p><strong><i class="fas fa-weight me-2"></i>Weight:</strong> ${pokemonWeight} kg</p>
+                                    <p><strong><i class="fas fa-map-marked-alt me-2"></i>Habitat:</strong> ${habitat.charAt(0).toUpperCase() + habitat.slice(1)}</p>
+                                    <p><strong><i class="fas fa-layer-group me-2"></i>Generation:</strong> ${generation}</p>
+                                    <p><strong><i class="fas fa-bolt me-2"></i>Abilities:</strong></p>
+                                    <ul class="mb-3">
+                                        ${pokemonAbilities.map(ability => `
+                                            <li class="text-capitalize">
+                                                <i class="fas fa-chevron-right me-2"></i>${ability.replace('-', ' ')}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <h6>Abilities</h6>
-                                <ul>
-                                    ${pokemonAbilities.map(ability => `<li class="text-capitalize">${ability.replace('-', ' ')}</li>`).join('')}
-                                </ul>
+                            <div class="col-md-8">
+                                <div class="pokemon-stats">
+                                    <h6><i class="fas fa-book-open me-2"></i>Description</h6>
+                                    <p class="mb-4">${description}</p>
+                                    
+                                    <h6 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Stats</h6>
+                                    ${statsBars}
+                                    
+                                    ${movesDisplay}
+                                    
+                                    ${evolutionDisplay}
+                                </div>
                             </div>
                         </div>
-                        
-                        <h6 class="mb-3">Stats</h6>
-                        ${statsBars}
-                        
-                        ${evolutionDisplay}
                     `);
                     
                     loadingSpinner.hide();
@@ -418,4 +592,40 @@ $(document).ready(function() {
         
         return result;
     }
+    
+    // Favorite functionality
+    function updateFavoriteButton(pokemonId, isFavorite) {
+        if (isFavorite) {
+            addToFavoritesBtn.html('<i class="fas fa-star"></i> Favorited');
+            addToFavoritesBtn.removeClass('btn-outline-primary').addClass('btn-primary');
+        } else {
+            addToFavoritesBtn.html('<i class="far fa-star"></i> Favorite');
+            addToFavoritesBtn.removeClass('btn-primary').addClass('btn-outline-primary');
+        }
+    }
+    
+    addToFavoritesBtn.click(function() {
+        const pokemonId = parseInt($('#pokemonModalTitle').text().split('#')[1].split(' ')[0]);
+        const index = favorites.indexOf(pokemonId);
+        
+        if (index === -1) {
+            // Add to favorites
+            favorites.push(pokemonId);
+            $(`.pokemon-card[data-id="${pokemonId}"]`).attr('data-favorite', 'true');
+            updateFavoriteButton(pokemonId, true);
+        } else {
+            // Remove from favorites
+            favorites.splice(index, 1);
+            $(`.pokemon-card[data-id="${pokemonId}"]`).attr('data-favorite', 'false');
+            updateFavoriteButton(pokemonId, false);
+            
+            // If we're in favorites filter, hide this card
+            if (currentFilter === 'favorites') {
+                $(`.pokemon-card[data-id="${pokemonId}"]`).parent().hide();
+            }
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('pokemonFavorites', JSON.stringify(favorites));
+    });
 });

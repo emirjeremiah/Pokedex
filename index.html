@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Pokédex</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-dragon"></i>
+                National Pokédex
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://pokeapi.co/" target="_blank">PokéAPI</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="generationFilterBtn">Filter by Generation</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container pokedex-container">
+        <div class="pokedex-header animate__animated animate__fadeIn">
+            <h1>National Pokédex</h1>
+            <p class="text-muted" id="generationInfo">All Pokémon from Generations 1-9</p>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="row search-container animate__animated animate__fadeIn">
+            <div class="col-md-8 mx-auto">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search Pokémon by name or number...">
+                    <button class="btn btn-danger" type="button" id="searchButton">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" id="resetButton">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generation Filter Dropdown (Hidden by default) -->
+        <div class="row mb-4 d-none" id="generationFilterContainer">
+            <div class="col-md-8 mx-auto">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Filter by Generation</h5>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary generation-filter" data-gen="all">All Generations</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="1">Generation 1 (Kanto)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="2">Generation 2 (Johto)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="3">Generation 3 (Hoenn)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="4">Generation 4 (Sinnoh)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="5">Generation 5 (Unova)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="6">Generation 6 (Kalos)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="7">Generation 7 (Alola)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="8">Generation 8 (Galar)</button>
+                            <button class="btn btn-outline-primary generation-filter" data-gen="9">Generation 9 (Paldea)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading" id="loadingSpinner">
+            <div class="spinner-border text-danger" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading Pokémon...</p>
+        </div>
+
+        <!-- Pokémon Grid -->
+        <div class="row" id="pokemonGrid"></div>
+
+        <!-- Load More Button -->
+        <div class="text-center mt-4" id="loadMoreContainer">
+            <button class="btn btn-primary" id="loadMoreBtn">Load More Pokémon</button>
+        </div>
+    </div>
+
+    <!-- Pokémon Modal -->
+    <div class="modal fade" id="pokemonModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pokemonModalTitle">Pokémon Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="pokemonModalBody">
+                    <!-- Content will be inserted here by JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Font Awesome -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+</body>
+</html>

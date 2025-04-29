@@ -51,7 +51,7 @@ body {
 
 .navbar-brand img {
     height: 30px;
-    filter: brightness(0) invert(1);
+    filter: none;
 }
 
 .navbar-toggler {
@@ -97,6 +97,8 @@ body {
 }
 
 .header-content {
+    position: relative;
+    overflow: hidden;
     padding: 20px;
     background-color: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(5px);
@@ -117,6 +119,18 @@ body {
     color: var(--seafoam);
     font-size: 1.1rem;
     font-weight: 400;
+}
+
+.header-content::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('assets/wave-pattern.png');
+    opacity: 0.1;
+    z-index: -1;
 }
 
 /* Search Box */
@@ -350,10 +364,24 @@ body {
 }
 
 .modal-header {
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(to right, var(--deep-blue), var(--ocean-blue));
     color: white;
     border-bottom: none;
     padding: 20px 25px;
+}
+
+.modal-header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('assets/wave-pattern.png');
+    opacity: 0.2;
+    z-index: -1;
 }
 
 .modal-title {
